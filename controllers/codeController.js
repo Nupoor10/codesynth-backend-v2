@@ -1,4 +1,5 @@
 const Code = require('../models/codeModel');
+const { v4: uuidv4 } = require('uuid');
 
 const getSingleCode = async(req, res) => {
     try {
@@ -37,26 +38,6 @@ const getAllCode = async(req, res) => {
         console.error(error);
         return res.status(500).json({
             message: 'Code fetching failed',
-            error: error.message,
-        });
-    }
-}
-
-const getAllUserCodes = async(req, res) => {
-    try {
-        const userId = req.user;
-        const codeDocs = await Code.find({
-            $and: [{ owner: { $ne: userId }, isRoom: false }]
-        }).populate('owner');
-
-        return res.status(200).json({
-            message : 'Codes found successfully',
-            codeDocs
-        })
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            message: 'Codes fetching failed',
             error: error.message,
         });
     }
@@ -147,11 +128,208 @@ const deleteCode = async(req, res) => {
     }
 }
 
+// FILE OPERATIONS
+const createFile = async(req, res) => {
+    try {
+        const codeId = req.params.codeId;
+        const { name, extension, content } = req.body;
+
+        if (!['html', 'css', 'js'].includes(extension)) {
+            return res.status(400).json({
+                message: 'Invalid file extension. Supported: html, css, js'
+            });
+        }
+
+        const codeDoc = await Code.findById(codeId);
+        if (!codeDoc) {
+            return res.status(404).json({
+                message: 'Code not found'
+            });
+        }
+
+        // Check for duplicate filename
+        const duplicateExists = codeDoc.files.some(f => f.name === name);
+        if (duplicateExists) {
+            return res.status(400).json({
+                message: 'File with this name already exists'
+            });
+        }
+
+        const newFile = {
+            id: uuidv4(),
+            name,
+            extension,
+            content: content || '',
+            order: codeDoc.files.length
+        };
+
+        codeDoc.files.push(newFile);
+        const updatedCode = await codeDoc.save();
+
+        return res.status(201).json({
+            message: 'File created successfully',
+            file: newFile,
+            files: updatedCode.files
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: 'File creation failed',
+            error: error.message
+        });
+    }
+}
+
+const updateFile = async(req, res) => {
+    try {
+        const { codeId, fileId } = req.params;
+        const { name, content } = req.body;
+
+        const codeDoc = await Code.findById(codeId);
+        if (!codeDoc) {
+            return res.status(404).json({
+                message: 'Code not found'
+            });
+        }
+
+        const fileIndex = codeDoc.files.findIndex(f => f.id === fileId);
+        if (fileIndex === -1) {
+            return res.status(404).json({
+                message: 'File not found'
+            });
+        }
+
+        // If renaming, check for duplicates
+        if (name && name !== codeDoc.files[fileIndex].name) {
+            const duplicateExists = codeDoc.files.some((f, idx) => f.name === name && idx !== fileIndex);
+            if (duplicateExists) {
+                return res.status(400).json({
+                    message: 'File with this name already exists'
+                });
+            }
+            codeDoc.files[fileIndex].name = name;
+        }
+
+        if (content !== undefined) {
+            codeDoc.files[fileIndex].content = content;
+        }
+
+        const updatedCode = await codeDoc.save();
+
+        return res.status(200).json({
+            message: 'File updated successfully',
+            file: codeDoc.files[fileIndex],
+            files: updatedCode.files
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: 'File update failed',
+            error: error.message
+        });
+    }
+}
+
+const deleteFile = async(req, res) => {
+    try {
+        const { codeId, fileId } = req.params;
+
+        const codeDoc = await Code.findById(codeId);
+        if (!codeDoc) {
+            return res.status(404).json({
+                message: 'Code not found'
+            });
+        }
+
+        const fileIndex = codeDoc.files.findIndex(f => f.id === fileId);
+        if (fileIndex === -1) {
+            return res.status(404).json({
+                message: 'File not found'
+            });
+        }
+
+        // Prevent deleting all files
+        if (codeDoc.files.length === 1) {
+            return res.status(400).json({
+                message: 'Cannot delete the last file in a code project'
+            });
+        }
+
+        codeDoc.files.splice(fileIndex, 1);
+        const updatedCode = await codeDoc.save();
+
+        return res.status(200).json({
+            message: 'File deleted successfully',
+            files: updatedCode.files
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: 'File deletion failed',
+            error: error.message
+        });
+    }
+}
+
+const reorderFiles = async(req, res) => {
+    try {
+        const codeId = req.params.codeId;
+        const { fileOrder } = req.body; // Array of fileIds in new order
+
+        if (!Array.isArray(fileOrder)) {
+            return res.status(400).json({
+                message: 'fileOrder must be an array of file IDs'
+            });
+        }
+
+        const codeDoc = await Code.findById(codeId);
+        if (!codeDoc) {
+            return res.status(404).json({
+                message: 'Code not found'
+            });
+        }
+
+        // Verify all fileIds exist
+        const fileMap = new Map(codeDoc.files.map(f => [f.id, f]));
+        for (const id of fileOrder) {
+            if (!fileMap.has(id)) {
+                return res.status(400).json({
+                    message: `File with ID ${id} not found`
+                });
+            }
+        }
+
+        // Reorder files
+        const reorderedFiles = fileOrder.map((id, index) => {
+            const file = fileMap.get(id);
+            file.order = index;
+            return file;
+        });
+
+        codeDoc.files = reorderedFiles;
+        const updatedCode = await codeDoc.save();
+
+        return res.status(200).json({
+            message: 'Files reordered successfully',
+            files: updatedCode.files
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: 'File reordering failed',
+            error: error.message
+        });
+    }
+}
+
 module.exports = {
     getSingleCode,
     getAllCode,
-    getAllUserCodes,
     createCode,
     updateCode,
-    deleteCode
+    deleteCode,
+    createFile,
+    updateFile,
+    deleteFile,
+    reorderFiles
 }

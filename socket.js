@@ -37,6 +37,27 @@ const initSocket = (server) => {
       socket.in(room).emit(ACTIONS.CODE_CHANGE, { lang: editorLang, code });
     });
 
+    // File operations
+    socket.on(ACTIONS.FILE_CONTENT_CHANGE, ({ fileId, content, room }) => {
+      socket.in(room).emit(ACTIONS.FILE_CONTENT_CHANGE, { fileId, content });
+    });
+
+    socket.on(ACTIONS.FILE_CREATE, ({ file, room }) => {
+      socket.in(room).emit(ACTIONS.FILE_CREATE, { file });
+    });
+
+    socket.on(ACTIONS.FILE_DELETE, ({ fileId, room }) => {
+      socket.in(room).emit(ACTIONS.FILE_DELETE, { fileId });
+    });
+
+    socket.on(ACTIONS.FILE_RENAME, ({ fileId, name, room }) => {
+      socket.in(room).emit(ACTIONS.FILE_RENAME, { fileId, name });
+    });
+
+    socket.on(ACTIONS.FILE_REORDER, ({ fileOrder, room }) => {
+      socket.in(room).emit(ACTIONS.FILE_REORDER, { fileOrder });
+    });
+
     socket.on(ACTIONS.DISCONNECTING, () => {
       const rooms = socket.rooms;
       rooms.forEach((roomId) => {
