@@ -46,14 +46,21 @@ const getAllCode = async(req, res) => {
 const createCode = async(req, res) => {
     try {
         const userId = req.user;
-        const { html, css, javascript, isRoom, title } = req.body;
+        const { isRoom, title } = req.body;
+
+        // Create a new code document with a single blank index.html file as entry
+        const defaultFile = {
+            id: uuidv4(),
+            name: 'index.html',
+            extension: 'html',
+            content: '',
+            order: 0
+        };
 
         const newCode = new Code({
             title,
-            html,
-            css,
-            javascript,
-            isRoom,
+            files: [defaultFile],
+            isRoom: !!isRoom,
             owner: userId,
         });
         const codeDoc = await newCode.save();
@@ -96,6 +103,42 @@ const updateCode = async(req, res) => {
         console.error(error);
         return res.status(500).json({
             message: 'Code update failed',
+            error: error.message,
+        });
+    }
+}
+
+const updateWhiteboard = async (req, res) => {
+    try {
+        const codeId = req.params.id;
+        const { whiteboardData } = req.body;
+
+        if (typeof whiteboardData !== 'string') {
+            return res.status(400).json({
+                message: 'whiteboardData must be a string'
+            });
+        }
+
+        const updatedCode = await Code.findByIdAndUpdate(
+            codeId,
+            { $set: { whiteboardData } },
+            { new: true }
+        );
+
+        if (!updatedCode) {
+            return res.status(404).json({
+                message: 'Code not found',
+            });
+        }
+
+        return res.status(200).json({
+            message: 'Whiteboard updated successfully',
+            updatedCode,
+        });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: 'Whiteboard update failed',
             error: error.message,
         });
     }
@@ -271,65 +314,14 @@ const deleteFile = async(req, res) => {
     }
 }
 
-const reorderFiles = async(req, res) => {
-    try {
-        const codeId = req.params.codeId;
-        const { fileOrder } = req.body; // Array of fileIds in new order
-
-        if (!Array.isArray(fileOrder)) {
-            return res.status(400).json({
-                message: 'fileOrder must be an array of file IDs'
-            });
-        }
-
-        const codeDoc = await Code.findById(codeId);
-        if (!codeDoc) {
-            return res.status(404).json({
-                message: 'Code not found'
-            });
-        }
-
-        // Verify all fileIds exist
-        const fileMap = new Map(codeDoc.files.map(f => [f.id, f]));
-        for (const id of fileOrder) {
-            if (!fileMap.has(id)) {
-                return res.status(400).json({
-                    message: `File with ID ${id} not found`
-                });
-            }
-        }
-
-        // Reorder files
-        const reorderedFiles = fileOrder.map((id, index) => {
-            const file = fileMap.get(id);
-            file.order = index;
-            return file;
-        });
-
-        codeDoc.files = reorderedFiles;
-        const updatedCode = await codeDoc.save();
-
-        return res.status(200).json({
-            message: 'Files reordered successfully',
-            files: updatedCode.files
-        });
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({
-            message: 'File reordering failed',
-            error: error.message
-        });
-    }
-}
-
 module.exports = {
     getSingleCode,
     getAllCode,
     createCode,
     updateCode,
+    updateWhiteboard,
     deleteCode,
     createFile,
     updateFile,
-    deleteFile,
-    reorderFiles
+    deleteFile
 }
