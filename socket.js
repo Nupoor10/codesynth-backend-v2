@@ -61,6 +61,13 @@ const initSocket = (server) => {
       if (room) socket.in(room).emit(ACTIONS.FILE_RENAME, { fileId, name });
     });
 
+    socket.on(ACTIONS.WORKSPACE_SAVED, ({ room, username }) => {
+        console.log(`💾 Broadcast save notification to room: ${room} by user: ${username}`);
+        
+        // Emit back out to all sockets currently residing inside the channel room
+        socket.to(room).emit(ACTIONS.WORKSPACE_SAVED_BROADCAST, { username });
+    });
+
     // 3. LEAK-PROOF DISCONNECT LIFECYCLE HANDLER WITH AUTO DATABASE CLEANUP
     socket.on('disconnecting', async () => {
       const registeredUser = socketRegistry.get(socket.id);
