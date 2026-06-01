@@ -182,7 +182,9 @@ const getAllUserRooms = async(req, res) => {
         const userID = req.user?._id || req.user || req.userId;
         const allRooms = await Room.find({ 
             $or: [{ admin: userID }, { participants: userID }]
-        }).populate('admin');
+        })
+          .populate('admin')
+          .populate('code');
 
         return res.status(200).json({
             message: "Rooms fetched successfully",
