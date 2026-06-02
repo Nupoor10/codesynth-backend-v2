@@ -39,11 +39,17 @@ wss.on('connection', (conn, req) => {
 
 server.on('upgrade', (request, socket, head) => {
   const pathname = request.url.split('?')[0];
+  const origin = request.headers.origin;
+  const allowedOrigin = process.env.FRONTEND_URL || "http://localhost:5173";
 
   if (pathname.startsWith('/yjs')) {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
-    });
+    if (!origin || origin === allowedOrigin) {
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        wss.emit('connection', ws, request);
+      });
+    } else {
+      socket.destroy();
+    }
   }
 });
 
