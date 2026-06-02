@@ -4,7 +4,6 @@ const mongoose = require('mongoose');
 
 const createRoom = async(req, res) => {
     try {
-        // Adjust fallback to match your auth middleware schema attachment
         const userID = req.user?._id || req.user || req.userId;
         const { roomId, codeId } = req.body;
         
@@ -29,25 +28,22 @@ const getAllParticipants = async (req, res) => {
         const identifier = req.params.id;
         let userRoom = null;
 
-        // 1. If it's a valid 24-character hexadecimal MongoDB ObjectId
         if (mongoose.Types.ObjectId.isValid(identifier)) {
             const objectId = new mongoose.Types.ObjectId(identifier);
             userRoom = await Room.findOne({
                 $or: [
-                    { _id: objectId }, // Matches the true database record _id
-                    { code: objectId } // Matches the linked code document reference field
+                    { _id: objectId },
+                    { code: objectId }
                 ]
             }).populate('participants').populate('admin');
         }
 
-        // 2. Fallback: If it's a custom room string token (like a UUID)
         if (!userRoom) {
             userRoom = await Room.findOne({ roomId: identifier })
                 .populate('participants')
                 .populate('admin');
         }
 
-        // 3. Fail-safe exit if both search paths come up completely empty
         if (!userRoom) {
             return res.status(404).json({
                 message: "Room not found while attempting to fetch participant lists.",
@@ -55,7 +51,6 @@ const getAllParticipants = async (req, res) => {
             });
         }
 
-        // 4. Safely compile full active rosters non-destructively
         const allUsers = [...userRoom.participants];
         if (userRoom.admin) {
             const isAdminAlreadyPresent = allUsers.some(
@@ -82,9 +77,8 @@ const getAllParticipants = async (req, res) => {
 
 const addParticipant = async (req, res) => {
     try {
-        // FIX: Extract both roomID and roomId to support mismatched frontend frameworks safely
         const { roomId, roomID } = req.body;
-        const targetRoomIdentifier = roomId || roomID; // Falls back to whatever is populated
+        const targetRoomIdentifier = roomId || roomID;
         
         const participantID = req.user?._id || req.user || req.userId;
         
@@ -96,7 +90,6 @@ const addParticipant = async (req, res) => {
 
         let existingRoom = null;
 
-        // 1. Check if it's a valid 24-character hexadecimal ObjectId
         if (mongoose.Types.ObjectId.isValid(targetRoomIdentifier)) {
             const objectId = new mongoose.Types.ObjectId(targetRoomIdentifier);
             existingRoom = await Room.findOne({
@@ -107,7 +100,6 @@ const addParticipant = async (req, res) => {
             });
         }
 
-        // 2. Fallback to standard string property comparison matching (UUIDs)
         if (!existingRoom) {
             existingRoom = await Room.findOne({ roomId: targetRoomIdentifier });
         }
@@ -204,26 +196,22 @@ const getUserRoomById = async (req, res) => {
         const identifier = req.params.id;
         let userRoom = null;
 
-        // 1. If it's a valid 24-character hex string, prioritize a direct ID search
         if (mongoose.Types.ObjectId.isValid(identifier)) {
             const objectId = new mongoose.Types.ObjectId(identifier);
-            
             userRoom = await Room.findOne({
                 $or: [
-                    { _id: objectId },   // Matches your document's true _id field
-                    { code: objectId }   // Matches your document's code field reference
+                    { _id: objectId },
+                    { code: objectId }
                 ]
             }).populate('participants').populate('admin');
         }
 
-        // 2. Fallback: If nothing was found via ObjectId (or if it's a UUID string slug), query via roomId
         if (!userRoom) {
             userRoom = await Room.findOne({ roomId: identifier })
                 .populate('participants')
                 .populate('admin');
         }
 
-        // 3. Throw a clean error if both query tracking vectors miss entirely
         if (!userRoom) {
             return res.status(404).json({
                 message: "Room session not found in database.",
@@ -231,7 +219,6 @@ const getUserRoomById = async (req, res) => {
             });
         }
 
-        // Return the clean populated document structure
         return res.status(200).json({
             message: "Room fetched successfully",
             userRoom

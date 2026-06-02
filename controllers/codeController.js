@@ -48,7 +48,6 @@ const createCode = async(req, res) => {
         const userId = req.user;
         const { isRoom, title } = req.body;
 
-        // Create a new code document with a single blank index.html file as entry
         const defaultFile = {
             id: uuidv4(),
             name: 'index.html',
@@ -171,7 +170,6 @@ const deleteCode = async(req, res) => {
     }
 }
 
-// FILE OPERATIONS
 const createFile = async(req, res) => {
     try {
         const codeId = req.params.codeId;
@@ -190,7 +188,6 @@ const createFile = async(req, res) => {
             });
         }
 
-        // Check for duplicate filename
         const duplicateExists = codeDoc.files.some(f => f.name === name);
         if (duplicateExists) {
             return res.status(400).json({
@@ -242,7 +239,6 @@ const updateFile = async(req, res) => {
             });
         }
 
-        // If renaming, check for duplicates
         if (name && name !== codeDoc.files[fileIndex].name) {
             const duplicateExists = codeDoc.files.some((f, idx) => f.name === name && idx !== fileIndex);
             if (duplicateExists) {
@@ -291,7 +287,6 @@ const deleteFile = async(req, res) => {
             });
         }
 
-        // Prevent deleting all files
         if (codeDoc.files.length === 1) {
             return res.status(400).json({
                 message: 'Cannot delete the last file in a code project'
