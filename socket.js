@@ -4,6 +4,7 @@ const Room = require('./models/roomModel');
 
 const initSocket = (server) => {
   const io = new Server(server, {
+    destroyUpgrade: false,
     cors: {
       origin: process.env.FRONTEND_URL || "http://localhost:5173",
       methods: ["GET", "POST"],
